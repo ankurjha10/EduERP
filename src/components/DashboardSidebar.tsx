@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   GraduationCap,
   Menu,
@@ -29,6 +30,7 @@ const DashboardSidebar = ({ role, activeSection, onSectionChange, admissionsPend
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
+  const { user, profile, signOut } = useAuth();
 
   const getMenuItems = () => {
     switch(role) {
@@ -64,8 +66,8 @@ const DashboardSidebar = ({ role, activeSection, onSectionChange, admissionsPend
 
   const menuItems = getMenuItems();
 
-  const handleLogout = () => {
-    // In a real app, this would clear tokens, etc.
+  const handleLogout = async () => {
+    await signOut();
     window.location.href = '/';
   };
 
@@ -155,7 +157,7 @@ const DashboardSidebar = ({ role, activeSection, onSectionChange, admissionsPend
           {!isCollapsed && (
             <div className="mb-3 p-3 bg-muted/50 rounded-lg">
               <div className="text-sm font-medium capitalize">{role}</div>
-              <div className="text-xs text-muted-foreground">demo@edu.com</div>
+              <div className="text-xs text-muted-foreground">{profile?.email || user?.email || '—'}</div>
             </div>
           )}
           <Button

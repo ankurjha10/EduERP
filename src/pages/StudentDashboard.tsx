@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardSidebar from '@/components/DashboardSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
 import { 
   DollarSign, 
   Building2, 
@@ -21,53 +24,98 @@ import {
   CreditCard,
   Download,
   Eye,
-  Save,
   Book,
   Award
 } from "lucide-react";
 
 const StudentDashboard = () => {
-  const { profile, signOut } = useAuth();
+  const { profile, user, signOut } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [profileData, setProfileData] = useState({
-    name: 'Aarav Sharma',
-    rollNo: 'CS001',
-    course: 'B.Tech Computer Science',
-    year: '2nd Year',
-    email: 'aarav.sharma@demo.edu',
-    phone: '+91 9876543210',
-    address: '123 Main St, Mumbai, Maharashtra',
-    guardianName: 'Raj Sharma',
-    guardianPhone: '+91 9876543211'
+    name: '',
+    rollNo: '',
+    course: '',
+    year: '',
+    email: '',
+    phone: '',
+    address: '',
+    guardianName: '',
+    guardianPhone: ''
   });
 
-  // Mock data
-  const stats = [
-    { title: 'Current CGPA', value: '8.7', icon: Award, color: 'dashboard-stat1' },
-    { title: 'Pending Fees', value: '₹15,000', icon: DollarSign, color: 'dashboard-stat2' },
-    { title: 'Hostel Room', value: '101-A', icon: Building2, color: 'dashboard-stat3' },
-    { title: 'Attendance', value: '87%', icon: CheckCircle, color: 'dashboard-stat4' },
-  ];
+  const [studentRecord, setStudentRecord] = useState<any | null>(null);
+  const [collegeName, setCollegeName] = useState<string>('');
+  const [admissionDate, setAdmissionDate] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const feeDetails = [
-    { type: 'Tuition Fee', amount: 25000, dueDate: '2024-12-20', status: 'Paid' },
-    { type: 'Hostel Fee', amount: 15000, dueDate: '2024-12-25', status: 'Pending' },
-    { type: 'Library Fee', amount: 2500, dueDate: '2024-12-30', status: 'Pending' },
-    { type: 'Lab Fee', amount: 5000, dueDate: '2025-01-05', status: 'Paid' },
-  ];
+  // Dynamic placeholders until respective tables are implemented
+  const stats: Array<{ title: string; value: string; icon: any; color: string }> = [];
+  const feeDetails: Array<{ type: string; amount: number; dueDate: string; status: string }> = [];
+  const examSchedule: Array<{ subject: string; date: string; time: string; duration: string; room: string }> = [];
+  const results: Array<{ subject: string; marks: string; grade: string; credits: number }> = [];
 
-  const examSchedule = [
-    { subject: 'Mathematics', date: '2024-12-20', time: '10:00 AM', duration: '3 hours', room: 'Hall A' },
-    { subject: 'Physics', date: '2024-12-22', time: '2:00 PM', duration: '3 hours', room: 'Hall B' },
-    { subject: 'Chemistry', date: '2024-12-24', time: '10:00 AM', duration: '3 hours', room: 'Lab 301' },
-  ];
+  useEffect(() => {
+    const fetchStudent = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        if (!user?.id) {
+          setLoading(false);
+          return;
+        }
 
-  const results = [
-    { subject: 'Mathematics', marks: '85/100', grade: 'A', credits: 4 },
-    { subject: 'Physics', marks: '78/100', grade: 'B+', credits: 4 },
-    { subject: 'Chemistry', marks: '92/100', grade: 'A+', credits: 4 },
-    { subject: 'Programming', marks: '88/100', grade: 'A', credits: 3 },
-  ];
+        const { data, error } = await supabase
+          .from('students')
+          .select(`
+            id, user_id, email, college_id, created_at,
+            full_name, dob, gender, nationality,
+            id_type, id_number, mobile,
+            address_current, address_permanent,
+            program, specialization, category,
+            father_name, father_occupation, mother_name, mother_occupation,
+            guardian_name, guardian_relationship,
+            parent_email, parent_mobile,
+            academic, documents, photo_url, admission_date,
+            colleges(name)
+          `)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          setError(error.message);
+          setLoading(false);
+          return;
+        }
+
+        setStudentRecord(data);
+        const fetchedCollegeName = (data as any)?.colleges?.name || '';
+        setCollegeName(fetchedCollegeName);
+        const admitted = (data as any)?.admission_date || data?.created_at;
+        setAdmissionDate(admitted ? new Date(admitted as string).toLocaleDateString() : '');
+
+        setProfileData(prev => ({
+          ...prev,
+          name: (data as any)?.full_name || profile?.full_name || prev.name,
+          email: (data as any)?.email || profile?.email || prev.email,
+          phone: (data as any)?.mobile || prev.phone,
+          address: (data as any)?.address_current || prev.address,
+          guardianName: (data as any)?.guardian_name || prev.guardianName,
+          guardianPhone: (data as any)?.parent_mobile || prev.guardianPhone,
+          course: (data as any)?.specialization || prev.course,
+          year: prev.year,
+          rollNo: prev.rollNo,
+        }));
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load student data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, profile?.full_name, profile?.email]);
 
   const handlePayment = (feeType, amount) => {
     toast({
@@ -76,24 +124,20 @@ const StudentDashboard = () => {
     });
   };
 
-  const handleProfileSave = () => {
-    toast({
-      title: "Profile Updated",
-      description: "Your profile information has been saved successfully",
-    });
-  };
+  // Profile is read-only for students; no save allowed
 
   const renderDashboardHome = () => (
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-6 border border-card-border">
-        <h1 className="text-2xl font-bold mb-2">Welcome back, {profileData.name}!</h1>
+        <h1 className="text-2xl font-bold mb-2">Welcome back, {profileData.name || 'Student'}!</h1>
         <p className="text-muted-foreground">
-          {profileData.course} • {profileData.year} • Roll No: {profileData.rollNo}
+          {collegeName ? `${collegeName} • ` : ''}{admissionDate ? `Admitted: ${admissionDate}` : ''}{(!collegeName && !admissionDate) ? '—' : ''}
         </p>
       </div>
 
       {/* Stats Grid */}
+      {stats.length > 0 && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => (
           <Card key={index} className="border-card-border">
@@ -109,6 +153,7 @@ const StudentDashboard = () => {
           </Card>
         ))}
       </div>
+      )}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -119,7 +164,10 @@ const StudentDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {examSchedule.slice(0, 3).map((exam, index) => (
+              {examSchedule.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No upcoming exams</div>
+              ) : (
+                examSchedule.slice(0, 3).map((exam, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <div>
                     <div className="font-medium">{exam.subject}</div>
@@ -135,7 +183,8 @@ const StudentDashboard = () => {
                     View Details
                   </Button>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -183,6 +232,33 @@ const StudentDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Attendance */}
+      <Card className="border-card-border">
+        <CardHeader>
+          <CardTitle>Attendance</CardTitle>
+          <CardDescription>This month</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const fallbackDemo = 87; // temporary demo value
+            const raw = (studentRecord as any)?.academic?.attendance_percentage as number | undefined;
+            const attendancePercent = (typeof raw === 'number' && raw >= 0 && raw <= 100) ? raw : fallbackDemo;
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">Present</div>
+                  <div className="text-lg font-semibold">{attendancePercent}%</div>
+                </div>
+                <Progress value={attendancePercent} />
+                {raw === undefined && (
+                  <div className="text-xs text-muted-foreground">Showing temporary demo data</div>
+                )}
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
     </div>
   );
 
@@ -200,7 +276,7 @@ const StudentDashboard = () => {
             <CardTitle>Total Fees</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹47,500</div>
+            <div className="text-2xl font-bold">{feeDetails.length > 0 ? `₹${feeDetails.reduce((t, f) => t + f.amount, 0).toLocaleString()}` : '—'}</div>
             <p className="text-sm text-muted-foreground">This semester</p>
           </CardContent>
         </Card>
@@ -209,8 +285,8 @@ const StudentDashboard = () => {
             <CardTitle>Amount Paid</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">₹30,000</div>
-            <p className="text-sm text-muted-foreground">63% completed</p>
+            <div className="text-2xl font-bold text-success">—</div>
+            <p className="text-sm text-muted-foreground">No data</p>
           </CardContent>
         </Card>
         <Card className="border-card-border">
@@ -218,8 +294,8 @@ const StudentDashboard = () => {
             <CardTitle>Pending Amount</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">₹17,500</div>
-            <p className="text-sm text-muted-foreground">Due soon</p>
+            <div className="text-2xl font-bold text-warning">—</div>
+            <p className="text-sm text-muted-foreground">No data</p>
           </CardContent>
         </Card>
       </div>
@@ -231,6 +307,9 @@ const StudentDashboard = () => {
           <CardDescription>Breakdown of your fees</CardDescription>
         </CardHeader>
         <CardContent>
+          {feeDetails.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No fee data available</div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -278,6 +357,7 @@ const StudentDashboard = () => {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -320,11 +400,11 @@ const StudentDashboard = () => {
               <Label className="text-sm text-muted-foreground">Roommates</Label>
               <div className="space-y-2 mt-2">
                 <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                  <span>Vikram Reddy</span>
+                  <span>Palak Mehta</span>
                   <Badge variant="outline">CS002</Badge>
                 </div>
                 <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                  <span>Arjun Nair</span>
+                  <span>Anjali</span>
                   <Badge variant="outline">CS003</Badge>
                 </div>
                 <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
@@ -426,7 +506,9 @@ const StudentDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {examSchedule.map((exam, index) => (
+                {examSchedule.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No exam schedule available</div>
+                ) : examSchedule.map((exam, index) => (
                   <Card key={index} className="border-card-border">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
@@ -475,7 +557,12 @@ const StudentDashboard = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {results.map((result, index) => (
+                  {results.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-sm text-muted-foreground">No results available</TableCell>
+                    </TableRow>
+                  ) : (
+                    results.map((result, index) => (
                     <TableRow key={index}>
                       <TableCell className="font-medium">{result.subject}</TableCell>
                       <TableCell>{result.marks}</TableCell>
@@ -495,26 +582,12 @@ const StudentDashboard = () => {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    ))
+                  )}
                 </TableBody>
               </Table>
               
-              <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-2xl font-bold">8.7</div>
-                    <div className="text-sm text-muted-foreground">Current CGPA</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">15</div>
-                    <div className="text-sm text-muted-foreground">Total Credits</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">87%</div>
-                    <div className="text-sm text-muted-foreground">Overall Percentage</div>
-                  </div>
-                </div>
-              </div>
+              {/* Summary cards removed until dynamic data exists */}
             </CardContent>
           </Card>
         </TabsContent>
@@ -526,35 +599,7 @@ const StudentDashboard = () => {
               <CardDescription>Your weekly class schedule</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-6 gap-2 text-sm">
-                <div className="font-semibold p-2">Time</div>
-                <div className="font-semibold p-2">Monday</div>
-                <div className="font-semibold p-2">Tuesday</div>
-                <div className="font-semibold p-2">Wednesday</div>
-                <div className="font-semibold p-2">Thursday</div>
-                <div className="font-semibold p-2">Friday</div>
-                
-                <div className="p-2 bg-muted/50">9:00-10:00</div>
-                <div className="p-2 bg-blue-50">Mathematics</div>
-                <div className="p-2 bg-green-50">Physics</div>
-                <div className="p-2 bg-blue-50">Mathematics</div>
-                <div className="p-2 bg-yellow-50">Chemistry</div>
-                <div className="p-2 bg-purple-50">Programming</div>
-                
-                <div className="p-2 bg-muted/50">10:00-11:00</div>
-                <div className="p-2 bg-green-50">Physics</div>
-                <div className="p-2 bg-yellow-50">Chemistry</div>
-                <div className="p-2 bg-green-50">Physics</div>
-                <div className="p-2 bg-purple-50">Programming</div>
-                <div className="p-2 bg-blue-50">Mathematics</div>
-                
-                <div className="p-2 bg-muted/50">11:00-12:00</div>
-                <div className="p-2 bg-gray-100">Break</div>
-                <div className="p-2 bg-gray-100">Break</div>
-                <div className="p-2 bg-gray-100">Break</div>
-                <div className="p-2 bg-gray-100">Break</div>
-                <div className="p-2 bg-gray-100">Break</div>
-              </div>
+              <div className="text-sm text-muted-foreground">No timetable available</div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -581,7 +626,8 @@ const StudentDashboard = () => {
               <Input
                 id="name"
                 value={profileData.name}
-                onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                disabled
+                className="bg-muted"
               />
             </div>
             
@@ -621,7 +667,8 @@ const StudentDashboard = () => {
                 id="email"
                 type="email"
                 value={profileData.email}
-                onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                disabled
+                className="bg-muted"
               />
             </div>
 
@@ -630,7 +677,8 @@ const StudentDashboard = () => {
               <Input
                 id="phone"
                 value={profileData.phone}
-                onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                disabled
+                className="bg-muted"
               />
             </div>
 
@@ -639,7 +687,8 @@ const StudentDashboard = () => {
               <Input
                 id="address"
                 value={profileData.address}
-                onChange={(e) => setProfileData({...profileData, address: e.target.value})}
+                disabled
+                className="bg-muted"
               />
             </div>
 
@@ -648,7 +697,8 @@ const StudentDashboard = () => {
               <Input
                 id="guardianName"
                 value={profileData.guardianName}
-                onChange={(e) => setProfileData({...profileData, guardianName: e.target.value})}
+                disabled
+                className="bg-muted"
               />
             </div>
 
@@ -657,17 +707,13 @@ const StudentDashboard = () => {
               <Input
                 id="guardianPhone"
                 value={profileData.guardianPhone}
-                onChange={(e) => setProfileData({...profileData, guardianPhone: e.target.value})}
+                disabled
+                className="bg-muted"
               />
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end">
-            <Button onClick={handleProfileSave}>
-              <Save className="mr-2 h-4 w-4" />
-              Save Changes
-            </Button>
-          </div>
+          {/* Read-only: save action removed for students */}
         </CardContent>
       </Card>
 
@@ -728,7 +774,19 @@ const StudentDashboard = () => {
       
       <div className="lg:ml-64 transition-all duration-300">
         <main className="p-4 lg:p-8 pt-16 lg:pt-8">
-          {renderContent()}
+          {error && (
+            <div className="mb-4">
+              <Alert variant="destructive">
+                <AlertTitle>Failed to load</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            </div>
+          )}
+          {loading ? (
+            <div className="text-sm text-muted-foreground">Loading your dashboard...</div>
+          ) : (
+            renderContent()
+          )}
         </main>
       </div>
     </div>

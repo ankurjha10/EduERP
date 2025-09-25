@@ -385,6 +385,7 @@ const AdminDashboard = () => {
   const [selectedApplication, setSelectedApplication] = useState<any | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
   const [rejectReason, setRejectReason] = useState<string>('');
+  const [showRejectReason, setShowRejectReason] = useState<boolean>(false);
   
   // User Management State
   const [userManagement, setUserManagement] = useState<UserManagementState>({
@@ -973,33 +974,202 @@ const AdminDashboard = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={isDetailsOpen} onOpenChange={(open) => {
+        setIsDetailsOpen(open);
+        if (!open) {
+          setShowRejectReason(false);
+          setRejectReason('');
+        }
+      }}>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Application Details</DialogTitle>
             <DialogDescription>Review all details before decision.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-auto">
-            {selectedApplication && (
-              <div className="space-y-2">
-                {Object.entries({ ...(selectedApplication.data || {}), ...selectedApplication })
-                  .filter(([k]) => !['data', 'application_data'].includes(k))
-                  .map(([key, value]) => (
-                    <div key={key} className="flex justify-between gap-4">
-                      <div className="text-sm text-muted-foreground capitalize whitespace-nowrap">{key.replace(/_/g, ' ')}</div>
-                      <div className="text-sm text-foreground break-all flex-1 text-right">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</div>
+          <div className="space-y-6 max-h-[70vh] overflow-auto">
+            {selectedApplication && (() => {
+              const d = selectedApplication.data || {};
+              const parents = d.parents || {};
+              const academic = d.academic || {};
+              const tenth = academic.tenth || {};
+              const twelfth = academic.twelfth || {};
+              const ug = academic.ug || {};
+              const documents = d.documents || {};
+              const isImageUrl = (url: string) => /\.(png|jpe?g|gif|webp|svg)$/i.test(url || '');
+
+              return (
+                <>
+                  <Card className="border-card-border">
+                    <CardHeader>
+                      <CardTitle>{d.full_name || getApplicantName(selectedApplication)}</CardTitle>
+                      <CardDescription>{selectedApplication.email || d.email}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">DOB</div>
+                          <div className="font-medium">{d.dob || '-'}</div>
         </div>
-                  ))}
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Gender</div>
+                          <div className="font-medium">{d.gender || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Mobile</div>
+                          <div className="font-medium">{d.mobile || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Program</div>
+                          <div className="font-medium">{d.program || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Specialization</div>
+                          <div className="font-medium">{d.specialization || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Category</div>
+                          <div className="font-medium">{d.category || '-'}</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-card-border">
+                    <CardHeader>
+                      <CardTitle>Parent / Guardian</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Father's Name</div>
+                          <div className="font-medium">{parents.father_name || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Father's Occupation</div>
+                          <div className="font-medium">{parents.father_occupation || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Mother's Name</div>
+                          <div className="font-medium">{parents.mother_name || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Mother's Occupation</div>
+                          <div className="font-medium">{parents.mother_occupation || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Parent Email</div>
+                          <div className="font-medium break-all">{parents.parent_email || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Parent Mobile</div>
+                          <div className="font-medium">{parents.parent_mobile || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Guardian Name</div>
+                          <div className="font-medium">{parents.guardian_name || '-'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground">Guardian Relationship</div>
+                          <div className="font-medium">{parents.guardian_relationship || '-'}</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-card-border">
+                    <CardHeader>
+                      <CardTitle>Academic Details</CardTitle>
+                      <CardDescription>10th, 12th, UG</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Level</TableHead>
+                              <TableHead>School/University</TableHead>
+                              <TableHead>Board/Program</TableHead>
+                              <TableHead>Year</TableHead>
+                              <TableHead>Score</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            <TableRow>
+                              <TableCell className="font-medium">10th</TableCell>
+                              <TableCell>{tenth.school || '-'}</TableCell>
+                              <TableCell>{tenth.board || '-'}</TableCell>
+                              <TableCell>{tenth.year || '-'}</TableCell>
+                              <TableCell>{tenth.score || '-'}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell className="font-medium">12th</TableCell>
+                              <TableCell>{twelfth.school || '-'}</TableCell>
+                              <TableCell>{twelfth.board || '-'}</TableCell>
+                              <TableCell>{twelfth.year || '-'}</TableCell>
+                              <TableCell>{twelfth.score || '-'}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell className="font-medium">UG</TableCell>
+                              <TableCell>{ug.university || '-'}</TableCell>
+                              <TableCell>{ug.program || '-'}</TableCell>
+                              <TableCell>{ug.year || '-'}</TableCell>
+                              <TableCell>{ug.score || '-'}</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                      {academic.subjects_breakdown && (
+                        <div className="mt-4 text-sm">
+                          <div className="text-muted-foreground mb-1">Subject-wise Marks</div>
+                          <div className="font-medium whitespace-pre-wrap break-words">{academic.subjects_breakdown}</div>
       </div>
             )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-card-border">
+                    <CardHeader>
+                      <CardTitle>Documents</CardTitle>
+                      <CardDescription>Click to open</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        {Object.entries(documents).length === 0 && (
+                          <div className="text-sm text-muted-foreground">No documents uploaded</div>
+                        )}
+                        {Object.entries(documents).map(([key, url]) => (
+                          <a key={key} href={String(url)} target="_blank" rel="noreferrer" className="block p-2 border rounded hover:bg-muted/50">
+                            <div className="text-xs text-muted-foreground mb-2 break-all">{key.replace(/_/g, ' ')}</div>
+                            {isImageUrl(String(url)) ? (
+                              <img src={String(url)} alt={key} className="h-32 w-full object-cover rounded" />
+                            ) : (
+                              <div className="text-sm font-medium break-all">Open Document</div>
+                            )}
+                          </a>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              );
+            })()}
+
+            {showRejectReason && (
             <div className="space-y-2">
               <Label>Reject Reason</Label>
               <Textarea placeholder="Provide reason if rejecting" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
       </div>
+            )}
           </div>
           <DialogFooter className="flex justify-between gap-2">
-            <Button variant="destructive" onClick={rejectApplication}>
-              Reject
+            <Button variant="destructive" onClick={() => {
+              if (!showRejectReason) {
+                setShowRejectReason(true);
+                return;
+              }
+              rejectApplication();
+            }}>
+              {showRejectReason ? 'Confirm Reject' : 'Reject'}
                   </Button>
             <Button onClick={approveApplication}>
               Approve
